@@ -1,2 +1,2 @@
-# Dark-Bytes
-školní projekt (e-shop)
+# lightning tempo
+školní projekt hra
