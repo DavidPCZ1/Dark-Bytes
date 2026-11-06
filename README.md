@@ -1,144 +1,163 @@
 # lightning tempo
 školní projekt hra
-<!DOCTYPE html>
-<html lang="cs">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Lightning Tempo</title>
-  <style>
-    body {
-      margin: 0;
-      background: #0d0d1a;
-      color: #fff;
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
-      overflow: hidden;
-    }
+import pygame
+import random
+import sys
 
-   
-  </style>
-</head>
-<body>
- h1 {
-      margin: 10px;
-      font-size: 2.5rem;
-      text-shadow: 0 0 15px #00e5ff;
-    }
+# Inicializace Pygame
+pygame.init()
 
-  <h1>⚡ LIGHTNING TEMPO ⚡</h1>
-  
-  <div class="info-bar">
-    <div>Skóre: <span id="score">0</span></div>
-    <div>Životy: <span id="lives">3</span></div>
-    <div>Tempo: <span id="tempo">1.0x</span></div>
-  </div>
+# Nastavení okna
+WIDTH, HEIGHT = 600, 500
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("⚡ Lightning Tempo ⚡")
 
-  <div class="game-container">
-    <div class="lane" id="lane-A"><div class="key-label">A</div></div>
-    <div class="lane" id="lane-S"><div class="key-label">S</div></div>
-    <div class="lane" id="lane-D"><div class="key-label">D</div></div>
-    <div class="lane" id="lane-F"><div class="key-label">F</div></div>
-  </div>
+# Barvy (RGB)
+BG_COLOR = (13, 13, 26)
+LANE_BG = (26, 26, 58)
+BORDER_COLOR = (0, 229, 255)
+ACTIVE_COLOR = (255, 230, 0)
+TEXT_COLOR = (255, 255, 255)
+ACCENT_COLOR = (0, 229, 255)
 
-  <button id="start-btn" onclick="startGame()">Start Hry</button>
+# Fonty
+font_large = pygame.font.SysFont("Segoe UI", 36, bold=True)
+font_medium = pygame.font.SysFont("Segoe UI", 24, bold=True)
+font_small = pygame.font.SysFont("Segoe UI", 18)
 
-  <script>
-    const keys = ['a', 's', 'd', 'f'];
-    let activeKey = null;
-    let score = 0;
-    let lives = 3;
-    let speed = 1200; // Počáteční čas na reakci v ms
-    let gameTimeout = null;
-    let isPlaying = false;
+# Herní stavy
+STATE_START = 0
+STATE_PLAYING = 1
+STATE_GAMEOVER = 2
+game_state = STATE_START
 
-    function startGame() {
-      score = 0;
-      lives = 3;
-      speed = 1200;
-      isPlaying = true;
-      document.getElementById('score').innerText = score;
-      document.getElementById('lives').innerText = lives;
-      document.getElementById('tempo').innerText = '1.0x';
-      document.getElementById('start-btn').style.display = 'none';
-      nextLightning();
-    }
+# Herní proměnné
+score = 0
+lives = 3
+speed = 1200  # Čas na reakci v ms
+active_lane = None
+last_spawn_time = 0
 
-    function nextLightning() {
-      if (!isPlaying) return;
+# Definice drah (klávesy a jejich pozice)
+lanes = [
+    {"key": pygame.K_a, "char": "A", "x": 120},
+    {"key": pygame.K_s, "char": "S", "x": 210},
+    {"key": pygame.K_d, "char": "D", "x": 300},
+    {"key": pygame.K_f, "char": "F", "x": 390}
+]
 
-      // Vyčistit předchozí aktivní dráhu
-      if (activeKey) {
-        document.getElementById(`lane-${activeKey.toUpperCase()}`).classList.remove('active');
-      }
+def reset_game():
+    global score, lives, speed, active_lane, last_spawn_time, game_state
+    score = 0
+    lives = 3
+    speed = 1200
+    active_lane = None
+    game_state = STATE_PLAYING
+    spawn_lightning()
 
-      // Výběr náhodného klávesy
-      const randomIndex = Math.floor(Math.random() * keys.length);
-      activeKey = keys[randomIndex];
+def spawn_lightning():
+    global active_lane, last_spawn_time
+    active_lane = random.choice(lanes)
+    last_spawn_time = pygame.time.get_ticks()
 
-      const lane = document.getElementById(`lane-${activeKey.toUpperCase()}`);
-      lane.classList.add('active');
+# Hlavní smyčka hry
+clock = pygame.time.Clock()
 
-      // Nastavení časovače pro stihnutí reakce
-      gameTimeout = setTimeout(() => {
-        // Hráč nestihl zareagovat
-        lane.classList.remove('active');
-        activeKey = null;
-        loseLife();
-      }, speed);
-    }
+while True:
+    current_time = pygame.time.get_ticks()
+    
+    # Zpracování událostí
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            pygame.quit()
+            sys.exit()
+            
+        if event.type == pygame.KEYDOWN:
+            if game_state == STATE_START:
+                if event.key == pygame.K_RETURN:
+                    reset_game()
+            elif game_state == STATE_PLAYING:
+                # Kontrola stisknuté klávesy
+                matched = False
+                for lane in lanes:
+                    if event.key == lane["key"]:
+                        matched = True
+                        if lane == active_lane:
+                            # Správná klávesa!
+                            score += 10
+                            # Zrychlení hry každých 50 bodů
+                            if score % 50 == 0 and speed > 400:
+                                speed -= 100
+                            spawn_lightning()
+                        else:
+                            # Špatná klávesa
+                            lives -= 1
+                            if lives <= 0:
+                                game_state = STATE_GAMEOVER
+                            else:
+                                spawn_lightning()
+                # Pokud hráč zmáčkl něco jiného, ignorujeme to
+            elif game_state == STATE_GAMEOVER:
+                if event.key == pygame.K_RETURN:
+                    reset_game()
 
-    document.addEventListener('keydown', (e) => {
-      if (!isPlaying || !activeKey) return;
+    # Kontrola vypršení času pro aktuální blesk
+    if game_state == STATE_PLAYING:
+        if current_time - last_spawn_time > speed:
+            lives -= 1
+            if lives <= 0:
+                game_state = STATE_GAMEOVER
+            else:
+                spawn_lightning()
 
-      const pressedKey = e.key.toLowerCase();
-      if (keys.includes(pressedKey)) {
-        clearTimeout(gameTimeout);
-        const lane = document.getElementById(`lane-${activeKey.toUpperCase()}`);
-        lane.classList.remove('active');
+    # Vykreslování
+    screen.fill(BG_COLOR)
 
-        if (pressedKey === activeKey) {
-          // Správná klávesa
-          score += 10;
-          document.getElementById('score').innerText = score;
-          
-          // Zvýšení tempa každých 50 bodů
-          if (score % 50 === 0 && speed > 400) {
-            speed -= 100;
-            const tempoVal = (1200 / speed).toFixed(1);
-            document.getElementById('tempo').innerText = `${tempoVal}x`;
-          }
+    if game_state == STATE_START:
+        title = font_large.render("⚡ LIGHTNING TEMPO ⚡", True, ACCENT_COLOR)
+        prompt = font_medium.render("Stiskni ENTER pro spuštění", True, TEXT_COLOR)
+        controls = font_small.render("Ovládání: Klávesy A, S, D, F", True, (150, 150, 200))
+        
+        screen.blit(title, (WIDTH // 2 - title.get_width() // 2, 150))
+        screen.blit(prompt, (WIDTH // 2 - prompt.get_width() // 2, 240))
+        screen.blit(controls, (WIDTH // 2 - controls.get_width() // 2, 320))
 
-          activeKey = null;
-          setTimeout(nextLightning, 200);
-        } else {
-          // Špatná klávesa
-          activeKey = null;
-          loseLife();
-        }
-      }
-    });
+    elif game_state == STATE_PLAYING:
+        # Horní lišta (Skóre, Životy, Tempo)
+        score_text = font_medium.render(f"Skóre: {score}", True, TEXT_COLOR)
+        lives_text = font_medium.render(f"Životy: {lives}", True, (255, 100, 100))
+        tempo_val = round(1200 / speed, 1)
+        tempo_text = font_medium.render(f"Tempo: {tempo_val}x", True, ACCENT_COLOR)
+        
+        screen.blit(score_text, (50, 40))
+        screen.blit(lives_text, (230, 40))
+        screen.blit(tempo_text, (410, 40))
 
-    function loseLife() {
-      lives--;
-      document.getElementById('lives').innerText = lives;
+        # Vykreslení drah
+        for lane in lanes:
+            is_active = (lane == active_lane)
+            box_color = ACTIVE_COLOR if is_active else LANE_BG
+            border_color = ACTIVE_COLOR if is_active else BORDER_COLOR
+            
+            # Vykreslení obdélníku dráhy
+            pygame.draw.rect(screen, box_color, (lane["x"], 150, 70, 220), border_radius=10)
+            pygame.draw.rect(screen, border_color, (lane["x"], 150, 70, 220), 2, border_radius=10)
+            
+            # Popisek klávesy dole
+            key_surf = font_large.render(lane["char"], True, TEXT_COLOR if not is_active else (0,0,0))
+            screen.blit(key_surf, (lane["x"] + 35 - key_surf.get_width() // 2, 400))
 
-      if (lives <= 0) {
-        gameOver();
-      } else {
-        setTimeout(nextLightning, 500);
-      }
-    }
+    elif game_state == STATE_GAMEOVER:
+        over_title = font_large.render("KONEC HRY", True, (255, 80, 80))
+        final_score = font_medium.render(f"Tvoje finální skóre: {score}", True, TEXT_COLOR)
+        restart_prompt = font_small.render("Stiskni ENTER pro restart", True, ACCENT_COLOR)
+        
+        screen.blit(over_title, (WIDTH // 2 - over_title.get_width() // 2, 160))
+        screen.blit(final_score, (WIDTH // 2 - final_score.get_width() // 2, 230))
+        screen.blit(restart_prompt, (WIDTH // 2 - restart_prompt.get_width() // 2, 300))
 
-    function gameOver() {
-      isPlaying = false;
-      alert(`Konec hry! Tvoje finální skóre: ${score}`);
-      document.getElementById('start-btn').style.display = 'inline-block';
-      document.getElementById('start-btn').innerText = 'Hrát znovu';
+    pygame.display.flip()
+    clock.tick(60)
     }
   </script>
 </body>
